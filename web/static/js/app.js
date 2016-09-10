@@ -15,6 +15,9 @@ import "phoenix_html"
 import  {Poll} from "./poll"
 let poll = new Poll()
 
+import { LivePoller } from "./live_poller"
+let livePoller = new LivePoller()
+
 // Import local files
 //
 // Local files can be imported directly using relative

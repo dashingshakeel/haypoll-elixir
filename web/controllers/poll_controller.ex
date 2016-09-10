@@ -2,6 +2,7 @@ defmodule Haypoll.PollController do
   use Haypoll.Web, :controller
 
   alias Haypoll.Poll
+  alias Haypoll.Entry
 
   def index(conn, _params) do
     polls = Repo.all(Poll)
@@ -13,10 +14,8 @@ defmodule Haypoll.PollController do
     render(conn, "new.html", changeset: changeset)
   end
 
-  def create(conn, %{"poll" => poll_params}) do
-    changeset = Poll.changeset(%Poll{}, poll_params)
-
-    case Repo.insert(changeset) do
+def create(conn, %{"poll" => poll_params}) do
+    case create_poll(poll_params) do
       {:ok, _poll} ->
         conn
         |> put_flash(:info, "Poll created successfully.")
@@ -26,11 +25,26 @@ defmodule Haypoll.PollController do
     end
   end
 
-  def show(conn, %{"id" => id}) do
-    poll = Repo.get!(Poll, id)
-    render(conn, "show.html", poll: poll)
-  end
+  defp create_poll(poll_params) do
+    Repo.transaction fn ->
+      changeset = Poll.changeset(%Poll{}, poll_params)
 
+      case Repo.insert(changeset) do
+        {:ok, poll} ->
+          Enum.map poll_params["entries"], fn entry ->
+            Repo.insert! build_assoc(poll, :entries, %{title: entry})
+          end
+        {:error, changeset} ->
+          Repo.rollback changeset
+      end
+    end
+  end
+ def show(conn, %{"id" => id}) do
+    entry_query = from e in Entry, order_by: [asc: e.id]
+    poll_query  = from p in Poll, preload: [entries: ^entry_query]
+    poll        = Repo.get!(poll_query, id)
+    render(conn, "show.html", poll: poll)
+ end
   def edit(conn, %{"id" => id}) do
     poll = Repo.get!(Poll, id)
     changeset = Poll.changeset(poll)
